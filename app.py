@@ -4,17 +4,17 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
 st.set_page_config(page_title="Kiểm tra tỉ lệ vàng đơn giản", layout="centered")
-# st.title("Kiểm tra Tỷ lệ Vàng (A–C–B)")
 
 # Tỷ lệ Vàng PHI ≈ 1.618
 PHI = (1 + 5**0.5) / 2
 MAX_DISPLAY_WIDTH = 700
+POINT_RADIUS = 4 # KÍCH THƯỚC ĐIỂM ĐÃ ĐƯỢC CHỈNH LẠI
 
 # ==============================
 # Các hàm vẽ
 # ==============================
-def ve_diem(draw, p, color, r=8):
-    """Vẽ điểm dưới dạng hình tròn."""
+def ve_diem(draw, p, color, r=POINT_RADIUS):
+    """Vẽ điểm dưới dạng hình tròn nhỏ."""
     draw.ellipse((p[0]-r, p[1]-r, p[0]+r, p[1]+r), fill=color)
 
 def ve_duong(draw, p1, p2, color="white", width=3):
@@ -23,12 +23,10 @@ def ve_duong(draw, p1, p2, color="white", width=3):
 
 # ==============================
 # Khởi tạo session state
-# ==============================
-# clicks chỉ lưu 0, 1 hoặc 2 điểm (A, B)
+# ==============================================================================
 if "clicks" not in st.session_state:
     st.session_state.clicks = []
 
-# results lưu kết quả của các đoạn đã đo
 if "results" not in st.session_state:
     st.session_state.results = []
 
@@ -96,13 +94,10 @@ if uploaded_file:
         # Vẽ đoạn AB
         ve_duong(draw, A_disp, B_disp)
 
-        # Tính Điểm Tỷ lệ Vàng C (chia đoạn AB theo tỉ lệ vàng, AC là đoạn lớn)
-        # AC = (1/PHI) * AB
-        # C = A + (B - A) / PHI 
+        # Tính Điểm Tỷ lệ Vàng C (AC là đoạn lớn)
         C = A + (B - A) / PHI
 
         # Tính độ dài
-        AB_len = np.linalg.norm(B - A)
         AC_len = np.linalg.norm(C - A) # Độ dài đoạn lớn
         CB_len = np.linalg.norm(B - C) # Độ dài đoạn nhỏ
 
