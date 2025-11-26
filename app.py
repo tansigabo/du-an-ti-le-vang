@@ -4,14 +4,36 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
 st.set_page_config(page_title="Kiểm tra điểm tỉ lệ vàng", layout="centered")
-st.title("📐 Kiểm tra điểm gần tỉ lệ vàng")
-st.write("Chọn **3 điểm**: Điểm đầu (A), điểm cuối (B), điểm giữa muốn kiểm tra (M).")
+st.title("📐 Kiểm tra điểm gần tỉ lệ vàng (A–B–M)")
+st.write("Chọn **A (đầu)** → **B (cuối)** → hệ thống vẽ đường thẳng nét đứt → sau đó chọn **M**, chương trình sẽ ép M vào đúng đường thẳng AB.")
 
 PHI = (1 + 5**0.5) / 2
 MAX_DISPLAY_WIDTH = 700
 
-def ve_diem(draw, p, color, r=4):
+def ve_diem(draw, p, color, r=5):
     draw.ellipse((p[0]-r, p[1]-r, p[0]+r, p[1]+r), fill=color)
+
+def ve_duong_dut(draw, p1, p2, step=12):
+    """Vẽ đường thẳng nét đứt từ p1 đến p2"""
+    x1, y1 = p1
+    x2, y2 = p2
+    length = int(np.linalg.norm(np.array(p2)-np.array(p1)))
+    for i in range(0, length, step*2):
+        t1 = i/length
+        t2 = min((i+step)/length, 1)
+        xa, ya = x1 + (x2-x1)*t1, y1 + (y2-y1)*t1
+        xb, yb = x1 + (x2-x1)*t2, y1 + (y2-y1)*t2
+        draw.line([(xa, ya), (xb, yb)], fill="white", width=2)
+
+def ep_diem_len_doan(A, B, M):
+    """Chiếu điểm M lên đoạn thẳng AB"""
+    A = np.array(A, float)
+    B = np.array(B, float)
+    M = np.array(M, float)
+    AB = B - A
+    t = np.dot(M - A, AB) / np.dot(AB, AB)
+    t = max(0, min(1, t))     # ép nằm trong đoạn [0,1]
+    return A + t*AB
 
 if 'clicks' not in st.session_state:
     st.session_state['clicks'] = []
@@ -37,10 +59,10 @@ if uploaded_file:
         ratio = 1.0
         scale_factor = 1.0
 
-    # Widget click
+    # CLICK
     value = streamlit_image_coordinates(display_image, key="click_area", width=display_image.width)
 
-    # Lưu điểm
+    # Lưu click
     if value:
         x_disp, y_disp = value["x"], value["y"]
         x_orig = int(x_disp * scale_factor)
@@ -49,39 +71,43 @@ if uploaded_file:
         if not st.session_state['clicks'] or st.session_state['clicks'][-1] != pt:
             st.session_state['clicks'].append(pt)
 
-    # Tạo overlay
+    clicks = st.session_state['clicks']
     overlay = display_image.copy()
     draw = ImageDraw.Draw(overlay)
     font = ImageFont.load_default()
 
-    clicks = st.session_state['clicks']
-
+    # --- VẼ A ---
     if len(clicks) >= 1:
-        A_disp = tuple((np.array(clicks[0]) * ratio).astype(int))
+        A = np.array(clicks[0])
+        A_disp = tuple((A * ratio).astype(int))
         ve_diem(draw, A_disp, "red")
 
+    # --- VẼ B + đường nét đứt ---
     if len(clicks) >= 2:
-        B_disp = tuple((np.array(clicks[1]) * ratio).astype(int))
+        B = np.array(clicks[1])
+        B_disp = tuple((B * ratio).astype(int))
         ve_diem(draw, B_disp, "red")
 
+        # Vẽ đường thẳng nét đứt A–B
+        ve_duong_dut(draw, A_disp, B_disp)
+
+    # --- XỬ LÝ M ---
     if len(clicks) >= 3:
         A = np.array(clicks[0])
         B = np.array(clicks[1])
-        M = np.array(clicks[2])
+        M_raw = np.array(clicks[2])
+
+        # Chiếu M lên đoạn AB
+        M = ep_diem_len_doan(A, B, M_raw)
 
         # Tính điểm tỉ lệ vàng C
         C = A + (B - A) / PHI
 
-        A_disp = (A * ratio).astype(int)
-        B_disp = (B * ratio).astype(int)
-        M_disp = (M * ratio).astype(int)
-        C_disp = (C * ratio).astype(int)
-
-        # Vẽ điểm A, B, M, C
-        ve_diem(draw, tuple(A_disp), "red")
-        ve_diem(draw, tuple(B_disp), "red")
-        ve_diem(draw, tuple(M_disp), "blue")
-        ve_diem(draw, tuple(C_disp), "yellow")
+        # Convert sang hiển thị
+        M_disp = tuple((M * ratio).astype(int))
+        C_disp = tuple((C * ratio).astype(int))
+        ve_diem(draw, M_disp, "blue")
+        ve_diem(draw, C_disp, "yellow")
 
         # Tính % sai lệch
         AC = np.linalg.norm(C - A)
@@ -89,12 +115,11 @@ if uploaded_file:
         percent = abs(AM - AC) / AC * 100
         percent_text = f"{percent:.1f}%"
 
-        # Ghi con số % cạnh điểm M
+        # Hiển thị số %
         draw.text((M_disp[0] + 5, M_disp[1] - 5), percent_text, fill="white", font=font)
 
-    st.image(overlay, caption="Ảnh với các điểm và thông số", use_column_width=True)
+    st.image(overlay, caption="Ảnh sau khi đánh dấu", use_column_width=True)
 
-    # Reset
     if st.button("Xóa"):
         st.session_state['clicks'] = []
-        st.experimental_rerun()
+        st.rerun()
