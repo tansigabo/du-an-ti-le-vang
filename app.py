@@ -3,9 +3,10 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
-st.set_page_config(page_title="Kiểm tra tỉ lệ vàng", layout="centered")
-st.title("Kiểm tra điểm gần tỉ lệ vàng (A–B–M)")
+st.set_page_config(page_title="Kiểm tra tỉ lệ vàng đơn giản", layout="centered")
+# st.title("Kiểm tra Tỷ lệ Vàng (A–C–B)")
 
+# Tỷ lệ Vàng PHI ≈ 1.618
 PHI = (1 + 5**0.5) / 2
 MAX_DISPLAY_WIDTH = 700
 
@@ -13,35 +14,21 @@ MAX_DISPLAY_WIDTH = 700
 # Các hàm vẽ
 # ==============================
 def ve_diem(draw, p, color, r=8):
+    """Vẽ điểm dưới dạng hình tròn."""
     draw.ellipse((p[0]-r, p[1]-r, p[0]+r, p[1]+r), fill=color)
 
-def ve_duong_dut(draw, p1, p2, step=16):
-    x1, y1 = p1
-    x2, y2 = p2
-    length = int(np.linalg.norm(np.array(p2)-np.array(p1)))
-    for i in range(0, length, step*2):
-        t1 = i / length
-        t2 = min((i + step) / length, 1)
-        xa, ya = x1 + (x2-x1)*t1, y1 + (y2-y1)*t1
-        xb, yb = x1 + (x2-x1)*t2, y1 + (y2-y1)*t2
-        draw.line([(xa, ya), (xb, yb)], fill="white", width=3)
-
-def ep_diem(A, B, M):
-    """Chiếu M lên đoạn AB"""
-    A = np.array(A, float)
-    B = np.array(B, float)
-    M = np.array(M, float)
-    AB = B - A
-    t = np.dot(M - A, AB) / np.dot(AB, AB)
-    t = max(0, min(1, t))
-    return A + t*AB
+def ve_duong(draw, p1, p2, color="white", width=3):
+    """Vẽ đường thẳng liền."""
+    draw.line([(p1[0], p1[1]), (p2[0], p2[1])], fill=color, width=width)
 
 # ==============================
-# Khởi tạo session
+# Khởi tạo session state
 # ==============================
+# clicks chỉ lưu 0, 1 hoặc 2 điểm (A, B)
 if "clicks" not in st.session_state:
     st.session_state.clicks = []
 
+# results lưu kết quả của các đoạn đã đo
 if "results" not in st.session_state:
     st.session_state.results = []
 
@@ -63,7 +50,7 @@ if uploaded_file:
 
     img = Image.open(uploaded_file).convert("RGB")
 
-    # Resize
+    # Xử lý resize ảnh
     display_img = img.copy()
     if img.width > MAX_DISPLAY_WIDTH:
         ratio = MAX_DISPLAY_WIDTH / img.width
@@ -78,72 +65,75 @@ if uploaded_file:
 
     if click:
         x, y = click["x"], click["y"]
+        # Chuyển tọa độ hiển thị về tọa độ ảnh gốc
         x = int(x * scale_back)
         y = int(y * scale_back)
+        
+        # Thêm điểm nếu nó khác với điểm cuối cùng (tránh click đúp)
         if not st.session_state.clicks or st.session_state.clicks[-1] != (x, y):
             st.session_state.clicks.append((x, y))
 
     clicks = st.session_state.clicks
     overlay = display_img.copy()
     draw = ImageDraw.Draw(overlay)
-    font = ImageFont.load_default()
 
     # ==============================
-    # Xử lý A – B – M
+    # Xử lý A – C – B
     # ==============================
     if len(clicks) >= 1:
         A = np.array(clicks[0])
         A_disp = tuple((A * ratio).astype(int))
+        # Điểm A: Đỏ
         ve_diem(draw, A_disp, "red")
 
-    if len(clicks) >= 2:
+    if len(clicks) == 2:
         B = np.array(clicks[1])
         B_disp = tuple((B * ratio).astype(int))
+        
+        # Điểm B: Đỏ
         ve_diem(draw, B_disp, "red")
-        ve_duong_dut(draw, A_disp, B_disp)
+        
+        # Vẽ đoạn AB
+        ve_duong(draw, A_disp, B_disp)
 
-    if len(clicks) >= 3:
-        M_raw = np.array(clicks[2])
-        M = ep_diem(A, B, M_raw)
-
-        # Điểm vàng
+        # Tính Điểm Tỷ lệ Vàng C (chia đoạn AB theo tỉ lệ vàng, AC là đoạn lớn)
+        # AC = (1/PHI) * AB
+        # C = A + (B - A) / PHI 
         C = A + (B - A) / PHI
 
-        # Convert
-        M_disp = tuple((M * ratio).astype(int))
+        # Tính độ dài
+        AB_len = np.linalg.norm(B - A)
+        AC_len = np.linalg.norm(C - A) # Độ dài đoạn lớn
+        CB_len = np.linalg.norm(B - C) # Độ dài đoạn nhỏ
+
+        # Convert C sang tọa độ hiển thị
         C_disp = tuple((C * ratio).astype(int))
 
-        ve_diem(draw, M_disp, "blue")
+        # Điểm C (Tỷ lệ Vàng): Vàng
         ve_diem(draw, C_disp, "yellow")
-
-        # Tính % lệch
-        AC = np.linalg.norm(C - A)
-        AM = np.linalg.norm(M - A)
-        percent = abs(AM - AC) / AC * 100
-
-        draw.text((M_disp[0] + 10, M_disp[1] - 10), f"{percent:.1f}%", fill="white", font=font)
 
         # Lưu kết quả
         st.session_state.results.append({
             "A": tuple(A.astype(int)),
             "B": tuple(B.astype(int)),
-            "M": tuple(M.astype(int)),
-            "golden": tuple(C.astype(int)),
-            "percent": round(percent, 2),
+            "Điểm Tỷ lệ Vàng C": tuple(C.astype(int)),
+            "Đoạn Lớn (AC)": f"{AC_len:.2f} px",
+            "Đoạn Nhỏ (CB)": f"{CB_len:.2f} px",
+            "Tỷ lệ (AC/CB)": f"{AC_len/CB_len:.3f}",
         })
 
         # Reset để đo đoạn tiếp theo
         st.session_state.clicks = []
 
-    st.image(overlay, caption="Ảnh sau khi đo", use_column_width=True)
+    st.image(overlay, use_column_width=True)
 
     # ==============================
     # BẢNG KẾT QUẢ
     # ==============================
     if st.session_state.results:
-        st.subheader("📌 Kết quả các đoạn đã đo")
-        st.table(st.session_state.results)
-
+        st.subheader("📏 Kết quả các đoạn đã đo")
+        st.dataframe(st.session_state.results)
+        
     # ==============================
     # Xóa toàn bộ
     # ==============================
