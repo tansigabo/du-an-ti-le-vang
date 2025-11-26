@@ -13,6 +13,10 @@ PHI = (1 + 5**0.5) / 2
 MAX_DISPLAY_WIDTH = 700 # Giới hạn chiều rộng ảnh để đảm bảo ảnh không bị tràn
 
 def ve_ty_le_vang(image, p1, p2):
+    """
+    Vẽ đoạn Tỉ lệ vàng lên ảnh.
+    p1, p2 phải là tọa độ tương ứng với kích thước của 'image'.
+    """
     draw = ImageDraw.Draw(image)
     
     A = np.array(p1)
@@ -45,7 +49,7 @@ def ve_ty_le_vang(image, p1, p2):
 
 # --- Khởi tạo Session State (Lưu trữ trạng thái) ---
 if 'clicks' not in st.session_state:
-    st.session_state['clicks'] = [] # Lưu trữ TẤT CẢ các điểm click
+    st.session_state['clicks'] = [] # Lưu trữ TẤT CẢ các điểm click (Tọa độ ảnh GỐC)
 if 'uploaded_img_data' not in st.session_state:
     st.session_state['uploaded_img_data'] = None
 
@@ -59,23 +63,37 @@ if uploaded_file is not None:
         st.session_state['uploaded_img_data'] = uploaded_file.name
 
     # Đọc ảnh gốc
-    image = Image.open(uploaded_file).convert("RGB")
+    image_orig = Image.open(uploaded_file).convert("RGB")
     
+    # --- Bắt đầu tính toán Tỉ lệ hiển thị (Display Ratio) ---
+    display_image = image_orig.copy()
+    display_ratio = 1.0 # Tỉ lệ thu nhỏ (display_width / original_width)
+    scale_factor = 1.0  # Tỉ lệ phóng to (original_width / display_width)
+
     # Logic 1: Đảm bảo ảnh luôn hiển thị full (rescale nếu quá lớn)
-    display_image = image.copy()
-    if display_image.width > MAX_DISPLAY_WIDTH:
-        ratio = MAX_DISPLAY_WIDTH / display_image.width
-        new_height = int(display_image.height * ratio)
+    if image_orig.width > MAX_DISPLAY_WIDTH:
+        display_ratio = MAX_DISPLAY_WIDTH / image_orig.width
+        scale_factor = image_orig.width / MAX_DISPLAY_WIDTH # Tỉ lệ để chuyển từ tọa độ hiển thị -> tọa độ gốc
+        new_height = int(image_orig.height * display_ratio)
         display_image = display_image.resize((MAX_DISPLAY_WIDTH, new_height))
+    # --- Kết thúc tính toán Tỉ lệ hiển thị ---
     
     # 2. Xử lý các điểm đã click
     
     # Logic 2: Vẽ TẤT CẢ các đoạn Tỉ lệ vàng đã đo
-    if len(st.session_state['clicks']) >= 2:# Lặp qua các cặp điểm (0, 1), (2, 3), (4, 5), ...
+    if len(st.session_state['clicks']) >= 2:
+        # Lặp qua các cặp điểm (0, 1), (2, 3), (4, 5), ...
         for i in range(0, len(st.session_state['clicks']) // 2 * 2, 2):
-            p1 = st.session_state['clicks'][i]
-            p2 = st.session_state['clicks'][i+1]
-            display_image = ve_ty_le_vang(display_image, p1, p2)
+            # p1_orig và p2_orig là tọa độ ảnh GỐC đã lưu
+            p1_orig = np.array(st.session_state['clicks'][i])
+            p2_orig = np.array(st.session_state['clicks'][i+1])
+            
+            # Chuyển đổi tọa độ GỐC sang tọa độ HIỂN THỊ để vẽ lên display_image
+            p1_disp = tuple((p1_orig * display_ratio).astype(int))
+            p2_disp = tuple((p2_orig * display_ratio).astype(int))
+
+            # Vẽ trên ảnh hiển thị
+            display_image = ve_ty_le_vang(display_image, p1_disp, p2_disp)
             
     # Hiển thị thông báo hướng dẫn
     num_clicks = len(st.session_state['clicks'])
@@ -91,13 +109,20 @@ if uploaded_file is not None:
 
     # 3. Widget click ảnh và lưu điểm
     # width=None để cho phép Streamlit tự quản lý kích thước trong giới hạn của MAX_DISPLAY_WIDTH đã đặt
+    # Chúng ta truyền display_image (có thể đã được resize) vào đây
     value = streamlit_image_coordinates(display_image, key="click_area", width=MAX_DISPLAY_WIDTH)
 
-    # 4. Lưu điểm click mới
+    # 4. Lưu điểm click mới (đã sửa lỗi)
     if value and 'clicks' in st.session_state:
-        point = (value['x'], value['y'])
+        # Tọa độ thu được là tọa độ trên ảnh hiển thị (display_image)
+        x_disp, y_disp = value['x'], value['y']
+        
+        # CHUYỂN ĐỔI TỌA ĐỘ HIỂN THỊ SANG TỌA ĐỘ GỐC
+        x_orig = int(x_disp * scale_factor)
+        y_orig = int(y_disp * scale_factor)
+        point_orig = (x_orig, y_orig)
         
         # Kiểm tra điểm click có hợp lệ không (tránh trùng lặp do Streamlit refresh)
-        if not st.session_state['clicks'] or point != st.session_state['clicks'][-1]:
-            st.session_state['clicks'].append(point)
+        if not st.session_state['clicks'] or point_orig != st.session_state['clicks'][-1]:
+            st.session_state['clicks'].append(point_orig)
             st.rerun() # Refresh để cập nhật hình ảnh vẽ mới
