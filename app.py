@@ -12,18 +12,14 @@ st.write("Tải ảnh lên và **click liên tiếp 2 điểm** để vẽ một
 PHI = (1 + 5**0.5) / 2 # Hằng số Tỉ lệ vàng (~1.61803)
 MAX_DISPLAY_WIDTH = 700 # Giới hạn chiều rộng ảnh để đảm bảo ảnh không bị tràn
 
-# Cố gắng load một font hệ thống để hiển thị đẹp hơn
-# Lưu ý: Font này có thể không có trên mọi hệ điều hành hoặc môi trường Streamlit Cloud
-try:
-    font = ImageFont.truetype("arial.ttf", 18) # Kích thước font 18
-    font_small = ImageFont.truetype("arial.ttf", 14) # Kích thước font nhỏ hơn cho thông số phụ
-except IOError:
-    font = ImageFont.load_default()
-    font_small = ImageFont.load_default()
+# Cố gắng load font mặc định cơ bản nhất (bitmap font) để tránh lỗi phông chữ.
+# KHÔNG cố gắng load font hệ thống (như arial) để đảm bảo tính tương thích tuyệt đối.
+font_basic = ImageFont.load_default()
+font_size = 14 # Giữ kích thước font nhỏ để dễ đọc
 
 def ve_ty_le_vang(image, p1, p2):
     """
-    Vẽ đoạn thẳng và các điểm Tỉ lệ vàng lên ảnh, đồng thời hiển thị các thông số:
+    Vẽ đoạn thẳng và các điểm Tỉ lệ vàng lên ảnh, đồng thời hiển thị các thông số số học.
     - p1 = Điểm A (Đầu mút, điểm bắt đầu)
     - p2 = Điểm C (Đầu mút, điểm kết thúc)
     - B = Điểm Tỉ lệ vàng chia đoạn AC sao cho BC/AB = PHI (Đoạn BC lớn hơn AB)
@@ -67,34 +63,40 @@ def ve_ty_le_vang(image, p1, p2):
     draw.ellipse((A_int[0]-r_dot, A_int[1]-r_dot, A_int[0]+r_dot, A_int[1]+r_dot), fill="red")
     draw.ellipse((C_int[0]-r_dot, C_int[1]-r_dot, C_int[0]+r_dot, C_int[1]+r_dot), fill="red")
     
-    # 3. VẼ THÔNG SỐ (TEXT)
+    # 3. VẼ THÔNG SỐ (CHỈ CÓ SỐ VÀ KÝ HIỆU CƠ BẢN)
     
     # Vị trí hiển thị thông số, điều chỉnh để không che điểm B
     text_x = B_int[0] + 15
     text_y = B_int[1] - 40 
     
-    # Nhãn điểm A, C, B
-    draw.text((A_int[0] - 25, A_int[1] - 25), "A", fill="yellow", font=font_small)
-    draw.text((C_int[0] + 10, C_int[1] - 25), "C", fill="yellow", font=font_small)
-    draw.text((B_int[0] + 10, B_int[1] - 25), "B", fill="#00ffff", font=font_small)
+    # Nhãn điểm A, C, B (Giữ lại để người dùng phân biệt)
+    draw.text((A_int[0] - 25, A_int[1] - 25), "A", fill="yellow", font=font_basic)
+    draw.text((C_int[0] + 10, C_int[1] - 25), "C", fill="yellow", font=font_basic)
+    draw.text((B_int[0] + 10, B_int[1] - 25), "B (GR)", fill="#00ffff", font=font_basic) # GR = Golden Ratio
 
-    # Hiển thị thông số chính
+    # Hiển thị Tỉ lệ vàng (R = Ratio)
+    # R: 1.62
     draw.text((text_x, text_y), 
-              f"Tỉ lệ vàng: {ratio:.2f}", 
-              fill="white", font=font) # Đã làm tròn và dùng font chính
+              f"R: {ratio:.2f}", 
+              fill="white", font=font_basic) 
     
-    draw.text((text_x, text_y + 25), 
-              f"Sai số: {error_percent:.1f}%", 
-              fill="red" if error_percent > 5 else "#00ff00", font=font) # Tô màu sai số
+    # Hiển thị Sai số (Error)
+    # E: 1.5%
+    draw.text((text_x, text_y + 20), 
+              f"E: {error_percent:.1f}%", 
+              fill="red" if error_percent > 5 else "#00ff00", font=font_basic)
     
-    # Các thông số độ dài đoạn, dùng font nhỏ hơn và màu nhạt hơn
-    draw.text((text_x, text_y + 55), 
-              f"Lớn (BC): {L_BC:.0f} px", 
-              fill="#cccccc", font=font_small)
+    # Hiển thị độ dài đoạn Lớn (L = Large)
+    # L: 125 px
+    draw.text((text_x, text_y + 40), 
+              f"L: {L_BC:.0f} px", 
+              fill="#cccccc", font=font_basic)
     
-    draw.text((text_x, text_y + 75), 
-              f"Nhỏ (AB): {L_AB:.0f} px", 
-              fill="#cccccc", font=font_small)
+    # Hiển thị độ dài đoạn Nhỏ (S = Small)
+    # S: 77 px
+    draw.text((text_x, text_y + 60), 
+              f"S: {L_AB:.0f} px", 
+              fill="#cccccc", font=font_basic)
     
     return image
 
@@ -133,7 +135,7 @@ if uploaded_file is not None:
             p2 = st.session_state['clicks'][i+1]
             display_image = ve_ty_le_vang(display_image, p1, p2)
             
-    # Hiển thị thông báo hướng dẫn
+    # Hiển thị thông báo hướng dẫn (vẫn cần tiếng Việt)
     num_clicks = len(st.session_state['clicks'])
     if num_clicks % 2 == 0:
         st.success(f"Đã đo {num_clicks // 2} đoạn. Hãy Click điểm BẮT ĐẦU (A) cho đoạn tiếp theo.")
