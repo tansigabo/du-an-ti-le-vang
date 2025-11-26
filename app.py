@@ -6,22 +6,27 @@ import numpy as np
 # --- Cấu hình trang ---
 st.set_page_config(page_title="Công cụ Đo Tỉ Lệ Vàng (KHKT)", layout="centered")
 st.title("📐 Công cụ Đo Tỉ Lệ Vàng Đa Điểm")
-st.write("Tải ảnh lên và **click liên tiếp 2 điểm** để vẽ một đoạn Tỉ lệ vàng. Kết quả Tỉ lệ vàng (Dòng trên) và Sai số (Dòng dưới) sẽ hiển thị ngay trên ảnh.")
+st.write("Tải ảnh lên và **click liên tiếp 2 điểm** để vẽ một đoạn Tỉ lệ vàng. Sau khi đo, kết quả kiểm tra Tỉ lệ vàng sẽ hiển thị ngay bên dưới ảnh.")
 
 # --- Hằng số và Hàm tính toán ---
 PHI = (1 + 5**0.5) / 2 # Hằng số Tỉ lệ vàng (~1.61803)
 MAX_DISPLAY_WIDTH = 700 # Giới hạn chiều rộng ảnh để đảm bảo ảnh không bị tràn
 
-# Sử dụng font mặc định cơ bản nhất, và tăng kích thước hiển thị
+# Sử dụng font mặc định cơ bản nhất cho các số trên ảnh
 font_basic = ImageFont.load_default() 
 font_size = 18 
+
+# Biến để lưu trữ kết quả của đoạn đo cuối cùng
+last_ratio = None
+last_error_percent = None
 
 def ve_ty_le_vang(image, p1, p2):
     """
     Vẽ đoạn thẳng, điểm Tỉ lệ vàng và hiển thị CHỈ CÁC GIÁ TRỊ SỐ cốt lõi.
-    - Dòng trên: Tỉ lệ vàng (R)
-    - Dòng dưới: Sai số (E)
+    Hàm này cũng trả về tỉ lệ và sai số để hiển thị kết quả kiểm tra.
     """
+    global last_ratio, last_error_percent
+
     draw = ImageDraw.Draw(image)
     
     A = np.array(p1)
@@ -45,6 +50,10 @@ def ve_ty_le_vang(image, p1, p2):
     # Tính sai số phần trăm so với PHI chuẩn
     error_percent = abs((ratio - PHI) / PHI) * 100 if PHI != 0 else 0
     
+    # Lưu kết quả của đoạn đo cuối cùng vào biến global
+    last_ratio = ratio
+    last_error_percent = error_percent
+    
     # 2. VẼ ĐƯỜNG VÀ ĐIỂM
     
     # Vẽ đường nối (Màu trắng mờ)
@@ -61,29 +70,24 @@ def ve_ty_le_vang(image, p1, p2):
     draw.ellipse((A_int[0]-r_dot, A_int[1]-r_dot, A_int[0]+r_dot, A_int[1]+r_dot), fill="red")
     draw.ellipse((C_int[0]-r_dot, C_int[1]-r_dot, C_int[0]+r_dot, C_int[1]+r_dot), fill="red")
     
-    # 3. VẼ THÔNG SỐ (CHỈ CÓ GIÁ TRỊ SỐ)
+    # 3. VẼ THÔNG SỐ (CHỈ CÓ GIÁ TRỊ SỐ TRÊN ẢNH)
     
-    # Vị trí hiển thị thông số, ngay trên điểm B
     text_x = B_int[0] + 15
     text_y = B_int[1] - 30 
     
     # --- Dòng 1: Tỉ lệ vàng (Ratio) ---
-    # Chỉ hiển thị giá trị số (ví dụ: 1.62)
     ratio_text = f"{ratio:.2f}"
     draw.text((text_x, text_y), 
               ratio_text, 
               fill="white", font=font_basic) 
     
     # --- Dòng 2: Sai số (Error) ---
-    # Chỉ hiển thị giá trị số (ví dụ: 1.5) - Đã bỏ ký hiệu %
     error_color = "red" if error_percent > 5 else "#00ff00"
     error_text = f"{error_percent:.1f}"
     draw.text((text_x, text_y + 15), 
               error_text, 
               fill=error_color, font=font_basic)
     
-    # KHÔNG hiển thị bất kỳ nhãn nào khác (GR, A, C)
-
     return image
 
 # --- Khởi tạo Session State (Lưu trữ trạng thái) ---
@@ -116,6 +120,7 @@ if uploaded_file is not None:
     # Logic 2: Vẽ TẤT CẢ các đoạn Tỉ lệ vàng đã đo
     if len(st.session_state['clicks']) >= 2:
         # Lặp qua các cặp điểm (0, 1), (2, 3), (4, 5), ...
+        # Lần lặp cuối cùng sẽ cập nhật last_ratio và last_error_percent
         for i in range(0, len(st.session_state['clicks']) // 2 * 2, 2):
             p1 = st.session_state['clicks'][i]
             p2 = st.session_state['clicks'][i+1]
@@ -131,6 +136,8 @@ if uploaded_file is not None:
     # Nút xóa tất cả các đoạn đã vẽ
     if st.button("Xóa TẤT CẢ các đoạn đã đo"):
         st.session_state['clicks'] = []
+        last_ratio = None
+        last_error_percent = None
         st.rerun()
 
     # 3. Widget click ảnh và lưu điểm
@@ -144,3 +151,20 @@ if uploaded_file is not None:
         if not st.session_state['clicks'] or point != st.session_state['clicks'][-1]:
             st.session_state['clicks'].append(point)
             st.rerun() # Refresh để cập nhật hình ảnh vẽ mới
+
+    # --- HIỂN THỊ KẾT QUẢ KIỂM TRA NGAY BÊN DƯỚI ẢNH ---
+    st.markdown("---")
+    
+    if last_error_percent is not None:
+        st.subheader("Kiểm tra Tỉ lệ vàng cho đoạn cuối cùng:")
+        
+        # Kiểm tra điều kiện đạt Tỉ lệ vàng (Sai số <= 5%)
+        if last_error_percent <= 5.0:
+            st.success(f"🎉 ĐOẠN NÀY ĐẠT TỈ LỆ VÀNG! (Sai số chỉ {last_error_percent:.1f}%)")
+            st.balloons() # Thêm hiệu ứng chúc mừng
+        else:
+            st.error(f"❌ ĐOẠN NÀY CHƯA ĐẠT TỈ LỆ VÀNG. (Sai số: {last_error_percent:.1f}%)")
+        
+        st.markdown(f"**Kết quả chi tiết:**")
+        st.markdown(f"- **Tỉ lệ đo được:** **{last_ratio:.3f}** (Tiêu chuẩn là $\\approx 1.618$)")
+        st.markdown(f"- **Sai số so với $\\Phi$:** **{last_error_percent:.1f}%**")
