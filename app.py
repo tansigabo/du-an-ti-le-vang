@@ -1,6 +1,6 @@
 import streamlit as st
 from streamlit_image_coordinates import streamlit_image_coordinates
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
 # --- Cấu hình trang ---
@@ -9,8 +9,17 @@ st.title("📐 Công cụ Đo Tỉ Lệ Vàng Đa Điểm")
 st.write("Tải ảnh lên và **click liên tiếp 2 điểm** để vẽ một đoạn Tỉ lệ vàng. Bạn có thể đo nhiều đoạn liên tục.")
 
 # --- Hằng số và Hàm tính toán ---
-PHI = (1 + 5**0.5) / 2 # Hằng số Tỉ lệ vàng (~1.618)
+PHI = (1 + 5**0.5) / 2 # Hằng số Tỉ lệ vàng (~1.61803)
 MAX_DISPLAY_WIDTH = 700 # Giới hạn chiều rộng ảnh để đảm bảo ảnh không bị tràn
+
+# Cố gắng load một font hệ thống để hiển thị đẹp hơn
+# Lưu ý: Font này có thể không có trên mọi hệ điều hành hoặc môi trường Streamlit Cloud
+try:
+    font = ImageFont.truetype("arial.ttf", 18) # Kích thước font 18
+    font_small = ImageFont.truetype("arial.ttf", 14) # Kích thước font nhỏ hơn cho thông số phụ
+except IOError:
+    font = ImageFont.load_default()
+    font_small = ImageFont.load_default()
 
 def ve_ty_le_vang(image, p1, p2):
     """
@@ -26,7 +35,6 @@ def ve_ty_le_vang(image, p1, p2):
     vec = C - A # Vector AC
     
     # Tính toán tọa độ điểm B (Điểm Tỉ lệ vàng)
-    # B = A + vec / PHI. Tức là AB là đoạn nhỏ (1/PHI) và BC là đoạn lớn (1)
     B = A + vec / PHI 
     
     # Chuyển về tọa độ nguyên (int) cho việc vẽ
@@ -38,8 +46,10 @@ def ve_ty_le_vang(image, p1, p2):
     L_BC = np.linalg.norm(C - B) # Chiều dài đoạn Lớn (từ B đến C)
     L_AB = np.linalg.norm(B - A) # Chiều dài đoạn Nhỏ (từ A đến B)
     
-    # Tỉ lệ BC/AB (phải gần bằng PHI)
     ratio = L_BC / L_AB if L_AB != 0 else 0
+    
+    # Tính sai số phần trăm so với PHI chuẩn
+    error_percent = abs((ratio - PHI) / PHI) * 100 if PHI != 0 else 0
     
     # 2. VẼ ĐƯỜNG VÀ ĐIỂM
     
@@ -57,31 +67,34 @@ def ve_ty_le_vang(image, p1, p2):
     draw.ellipse((A_int[0]-r_dot, A_int[1]-r_dot, A_int[0]+r_dot, A_int[1]+r_dot), fill="red")
     draw.ellipse((C_int[0]-r_dot, C_int[1]-r_dot, C_int[0]+r_dot, C_int[1]+r_dot), fill="red")
     
-    # 3. VẼ THÔNG SỐ (TEXT ĐƠN GIẢN)
+    # 3. VẼ THÔNG SỐ (TEXT)
     
-    # Vị trí hiển thị thông số gần điểm B
-    text_x = B_int[0] + 10
-    text_y = B_int[1] - 30 
+    # Vị trí hiển thị thông số, điều chỉnh để không che điểm B
+    text_x = B_int[0] + 15
+    text_y = B_int[1] - 40 
     
     # Nhãn điểm A, C, B
-    draw.text((A_int[0] - 20, A_int[1] - 20), "A", fill="yellow")
-    draw.text((C_int[0] + 10, C_int[1] - 20), "C", fill="yellow")
-    draw.text((B_int[0] + 10, B_int[1] - 20), "B (Tỉ lệ vàng)", fill="#00ffff")
+    draw.text((A_int[0] - 25, A_int[1] - 25), "A", fill="yellow", font=font_small)
+    draw.text((C_int[0] + 10, C_int[1] - 25), "C", fill="yellow", font=font_small)
+    draw.text((B_int[0] + 10, B_int[1] - 25), "B", fill="#00ffff", font=font_small)
 
-    # Hiển thị độ dài đoạn nhỏ AB
+    # Hiển thị thông số chính
     draw.text((text_x, text_y), 
-              f"Nhỏ (AB): {L_AB:.1f} px", 
-              fill="#00ffff")
+              f"Tỉ lệ vàng: {ratio:.2f}", 
+              fill="white", font=font) # Đã làm tròn và dùng font chính
     
-    # Hiển thị độ dài đoạn lớn BC
-    draw.text((text_x, text_y + 20), 
-              f"Lớn (BC): {L_BC:.1f} px", 
-              fill="#00ffff")
-
-    # Hiển thị Tỉ lệ vàng
-    draw.text((text_x, text_y + 40), 
-              f"TỈ LỆ BC/AB: {ratio:.3f} (~1.618)", 
-              fill="white")
+    draw.text((text_x, text_y + 25), 
+              f"Sai số: {error_percent:.1f}%", 
+              fill="red" if error_percent > 5 else "#00ff00", font=font) # Tô màu sai số
+    
+    # Các thông số độ dài đoạn, dùng font nhỏ hơn và màu nhạt hơn
+    draw.text((text_x, text_y + 55), 
+              f"Lớn (BC): {L_BC:.0f} px", 
+              fill="#cccccc", font=font_small)
+    
+    draw.text((text_x, text_y + 75), 
+              f"Nhỏ (AB): {L_AB:.0f} px", 
+              fill="#cccccc", font=font_small)
     
     return image
 
