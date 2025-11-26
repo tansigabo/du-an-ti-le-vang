@@ -13,33 +13,70 @@ PHI = (1 + 5**0.5) / 2
 MAX_DISPLAY_WIDTH = 700 # Giới hạn chiều rộng ảnh để đảm bảo ảnh không bị tràn
 
 def ve_ty_le_vang(image, p1, p2):
+    """
+    Vẽ đoạn thẳng và các điểm Tỉ lệ vàng lên ảnh, đồng thời hiển thị thông số.
+    """
     draw = ImageDraw.Draw(image)
     
     A = np.array(p1)
     B = np.array(p2)
     vec = B - A
     
-    # Tính điểm C1, C2
+    # Tính toán tọa độ các điểm C1, C2
+    # C1 là điểm chia gần B (tỷ lệ 1/PHI), C2 là điểm chia gần A (tỷ lệ PHI-1)
     C1 = A + vec / PHI
     C2 = A + vec * (PHI - 1)
     
-    # Chuyển về tọa độ nguyên
+    # Chuyển về tọa độ nguyên (int) cho việc vẽ
     C1_int = tuple(C1.astype(int))
     C2_int = tuple(C2.astype(int))
     A_int = tuple(A.astype(int))
     B_int = tuple(B.astype(int))
     
+    # 1. TÍNH TOÁN KHOẢNG CÁCH (PIXEL)
+    L_AB = np.linalg.norm(vec) # Chiều dài đoạn AB
+    L_AC1 = np.linalg.norm(C1 - A) # Chiều dài đoạn AC1 (Đoạn lớn)
+    L_C1B = np.linalg.norm(B - C1) # Chiều dài đoạn C1B (Đoạn nhỏ)
+    
+    # 2. VẼ ĐƯỜNG VÀ ĐIỂM
     # Vẽ đường nối (Màu trắng mờ)
     draw.line([A_int, B_int], fill="white", width=2)
     
     # Vẽ điểm tỉ lệ vàng (Màu xanh lơ)
     r = 8
+    # Điểm C1 (Điểm chia)
     draw.ellipse((C1_int[0]-r, C1_int[1]-r, C1_int[0]+r, C1_int[1]+r), fill="#00ffff", outline="black")
+    # Điểm C2 (Điểm còn lại, vẽ nhỏ hơn)
     draw.ellipse((C2_int[0]-5, C2_int[1]-5, C2_int[0]+5, C2_int[1]+5), fill="#00ffff", outline="black")
-    # Vẽ điểm mốc (Màu đỏ)
+    
+    # Vẽ điểm mốc A, B (Màu đỏ)
     r_dot = 4
     draw.ellipse((A_int[0]-r_dot, A_int[1]-r_dot, A_int[0]+r_dot, A_int[1]+r_dot), fill="red")
     draw.ellipse((B_int[0]-r_dot, B_int[1]-r_dot, B_int[0]+r_dot, B_int[1]+r_dot), fill="red")
+    
+    # 3. VẼ THÔNG SỐ (TEXT)
+    # Sử dụng màu tương phản (vàng, xanh lơ) để dễ đọc trên nền ảnh
+    
+    # Thông số cho điểm A (START)
+    draw.text((A_int[0] + 10, A_int[1] - 20), f"A: ({A_int[0]}, {A_int[1]})", fill="yellow")
+    
+    # Thông số cho điểm B (END)
+    draw.text((B_int[0] + 10, B_int[1] - 20), f"B: ({B_int[0]}, {B_int[1]})", fill="yellow")
+    
+    # Thông số Chiều dài (Đoạn AB - ở giữa)
+    mid_point = ((A_int[0] + B_int[0]) // 2, (A_int[1] + B_int[1]) // 2)
+    draw.text((mid_point[0], mid_point[1] - 30), f"L_TOTAL (AB): {L_AB:.1f} px", fill="white")
+    
+    # Thông số Điểm chia C1 và Chiều dài đoạn Tỉ lệ vàng
+    
+    # Tọa độ C1
+    draw.text((C1_int[0] + 10, C1_int[1] - 20), f"C1: ({C1_int[0]}, {C1_int[1]})", fill="#00ffff")
+    
+    # Chiều dài AC1 (Đoạn lớn)
+    draw.text((C1_int[0] + 10, C1_int[1] + 10), f"AC1 (Lớn): {L_AC1:.1f} px", fill="#00ffff")
+    
+    # Chiều dài C1B (Đoạn nhỏ)
+    draw.text((C1_int[0] + 10, C1_int[1] + 30), f"C1B (Nhỏ): {L_C1B:.1f} px", fill="#00ffff")
     
     return image
 
@@ -76,6 +113,7 @@ if uploaded_file is not None:
         for i in range(0, len(st.session_state['clicks']) // 2 * 2, 2):
             p1 = st.session_state['clicks'][i]
             p2 = st.session_state['clicks'][i+1]
+            # CHÚ Ý: Hàm ve_ty_le_vang giờ đây vẽ cả text thông số
             display_image = ve_ty_le_vang(display_image, p1, p2)
             
     # Hiển thị thông báo hướng dẫn
