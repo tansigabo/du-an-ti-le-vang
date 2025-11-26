@@ -6,23 +6,22 @@ import numpy as np
 # --- Cấu hình trang ---
 st.set_page_config(page_title="Công cụ Đo Tỉ Lệ Vàng (KHKT)", layout="centered")
 st.title("📐 Công cụ Đo Tỉ Lệ Vàng Đa Điểm")
-st.write("Tải ảnh lên và **click liên tiếp 2 điểm** để vẽ một đoạn Tỉ lệ vàng. Bạn có thể đo nhiều đoạn liên tục.")
+st.write("Tải ảnh lên và **click liên tiếp 2 điểm** để vẽ một đoạn Tỉ lệ vàng. Kết quả Tỉ lệ vàng và Sai số sẽ hiển thị ngay trên ảnh.")
 
 # --- Hằng số và Hàm tính toán ---
 PHI = (1 + 5**0.5) / 2 # Hằng số Tỉ lệ vàng (~1.61803)
 MAX_DISPLAY_WIDTH = 700 # Giới hạn chiều rộng ảnh để đảm bảo ảnh không bị tràn
 
-# Cố gắng load font mặc định cơ bản nhất (bitmap font) để tránh lỗi phông chữ.
-# KHÔNG cố gắng load font hệ thống (như arial) để đảm bảo tính tương thích tuyệt đối.
-font_basic = ImageFont.load_default()
-font_size = 14 # Giữ kích thước font nhỏ để dễ đọc
+# Sử dụng font mặc định cơ bản nhất, đảm bảo hiển thị số không lỗi
+font_basic = ImageFont.load_default() 
+font_size = 14 
 
 def ve_ty_le_vang(image, p1, p2):
     """
-    Vẽ đoạn thẳng và các điểm Tỉ lệ vàng lên ảnh, đồng thời hiển thị các thông số số học.
+    Vẽ đoạn thẳng, điểm Tỉ lệ vàng và hiển thị CHỈ các giá trị số cốt lõi.
     - p1 = Điểm A (Đầu mút, điểm bắt đầu)
     - p2 = Điểm C (Đầu mút, điểm kết thúc)
-    - B = Điểm Tỉ lệ vàng chia đoạn AC sao cho BC/AB = PHI (Đoạn BC lớn hơn AB)
+    - B = Điểm Tỉ lệ vàng chia đoạn AC sao cho BC/AB = PHI 
     """
     draw = ImageDraw.Draw(image)
     
@@ -39,8 +38,8 @@ def ve_ty_le_vang(image, p1, p2):
     C_int = tuple(C.astype(int))
     
     # 1. TÍNH TOÁN KHOẢNG CÁCH (PIXEL)
-    L_BC = np.linalg.norm(C - B) # Chiều dài đoạn Lớn (từ B đến C)
-    L_AB = np.linalg.norm(B - A) # Chiều dài đoạn Nhỏ (từ A đến B)
+    L_BC = np.linalg.norm(C - B) # Chiều dài đoạn Lớn
+    L_AB = np.linalg.norm(B - A) # Chiều dài đoạn Nhỏ
     
     ratio = L_BC / L_AB if L_AB != 0 else 0
     
@@ -53,8 +52,8 @@ def ve_ty_le_vang(image, p1, p2):
     draw.line([A_int, C_int], fill="white", width=2)
     
     # Bán kính điểm
-    r_main = 8 # Bán kính cho điểm B (Tỉ lệ vàng)
-    r_dot = 4 # Bán kính cho điểm A, C (Đầu mút)
+    r_main = 8 
+    r_dot = 4 
 
     # Vẽ điểm tỉ lệ vàng B (Màu xanh lơ)
     draw.ellipse((B_int[0]-r_main, B_int[1]-r_main, B_int[0]+r_main, B_int[1]+r_main), fill="#00ffff", outline="black")
@@ -63,41 +62,31 @@ def ve_ty_le_vang(image, p1, p2):
     draw.ellipse((A_int[0]-r_dot, A_int[1]-r_dot, A_int[0]+r_dot, A_int[1]+r_dot), fill="red")
     draw.ellipse((C_int[0]-r_dot, C_int[1]-r_dot, C_int[0]+r_dot, C_int[1]+r_dot), fill="red")
     
-    # 3. VẼ THÔNG SỐ (CHỈ CÓ SỐ VÀ KÝ HIỆU CƠ BẢN)
+    # 3. VẼ THÔNG SỐ (CHỈ CÓ SỐ)
     
-    # Vị trí hiển thị thông số, điều chỉnh để không che điểm B
+    # Vị trí hiển thị thông số, ngay trên điểm B
     text_x = B_int[0] + 15
     text_y = B_int[1] - 40 
     
-    # Nhãn điểm A, C, B (Giữ lại để người dùng phân biệt)
-    draw.text((A_int[0] - 25, A_int[1] - 25), "A", fill="yellow", font=font_basic)
-    draw.text((C_int[0] + 10, C_int[1] - 25), "C", fill="yellow", font=font_basic)
-    draw.text((B_int[0] + 10, B_int[1] - 25), "B (GR)", fill="#00ffff", font=font_basic) # GR = Golden Ratio
-
-    # Hiển thị Tỉ lệ vàng (R = Ratio)
-    # R: 1.62
+    # --- Dòng 1: Tỉ lệ vàng (Ratio) ---
+    # Chỉ hiển thị giá trị số R (ví dụ: 1.62)
+    ratio_text = f"{ratio:.2f}"
     draw.text((text_x, text_y), 
-              f"R: {ratio:.2f}", 
+              ratio_text, 
               fill="white", font=font_basic) 
     
-    # Hiển thị Sai số (Error)
-    # E: 1.5%
+    # --- Dòng 2: Sai số (Error) ---
+    # Chỉ hiển thị giá trị số E (ví dụ: 1.5%)
+    error_color = "red" if error_percent > 5 else "#00ff00"
+    error_text = f"{error_percent:.1f}%"
     draw.text((text_x, text_y + 20), 
-              f"E: {error_percent:.1f}%", 
-              fill="red" if error_percent > 5 else "#00ff00", font=font_basic)
+              error_text, 
+              fill=error_color, font=font_basic)
     
-    # Hiển thị độ dài đoạn Lớn (L = Large)
-    # L: 125 px
-    draw.text((text_x, text_y + 40), 
-              f"L: {L_BC:.0f} px", 
-              fill="#cccccc", font=font_basic)
-    
-    # Hiển thị độ dài đoạn Nhỏ (S = Small)
-    # S: 77 px
-    draw.text((text_x, text_y + 60), 
-              f"S: {L_AB:.0f} px", 
-              fill="#cccccc", font=font_basic)
-    
+    # Nhãn điểm A, C (Chỉ là chấm màu, không đặt chữ A, C)
+    # Giữ lại nhãn B để biết điểm nào là Tỉ lệ vàng
+    draw.text((B_int[0] + 10, B_int[1] - 25), "GR", fill="#00ffff", font=font_basic) 
+
     return image
 
 # --- Khởi tạo Session State (Lưu trữ trạng thái) ---
@@ -138,9 +127,9 @@ if uploaded_file is not None:
     # Hiển thị thông báo hướng dẫn (vẫn cần tiếng Việt)
     num_clicks = len(st.session_state['clicks'])
     if num_clicks % 2 == 0:
-        st.success(f"Đã đo {num_clicks // 2} đoạn. Hãy Click điểm BẮT ĐẦU (A) cho đoạn tiếp theo.")
+        st.success(f"Đã đo {num_clicks // 2} đoạn. Hãy Click điểm BẮT ĐẦU cho đoạn tiếp theo.")
     else:
-        st.info(f"Đã chọn điểm thứ {num_clicks}. Hãy Click điểm KẾT THÚC (C).")
+        st.info(f"Đã chọn điểm thứ {num_clicks}. Hãy Click điểm KẾT THÚC.")
 
     # Nút xóa tất cả các đoạn đã vẽ
     if st.button("Xóa TẤT CẢ các đoạn đã đo"):
@@ -156,5 +145,7 @@ if uploaded_file is not None:
         
         # Kiểm tra điểm click có hợp lệ không (tránh trùng lặp do Streamlit refresh)
         if not st.session_state['clicks'] or point != st.session_state['clicks'][-1]:
-            st.session_state['clicks'].append(point)
-            st.rerun() # Refresh để cập nhật hình ảnh vẽ mới
+            # Đảm bảo chỉ thêm điểm thứ 2 nếu điểm thứ nhất đã có
+            if len(st.session_state['clicks']) % 2 != 0 or len(st.session_state['clicks']) % 2 == 0:
+                st.session_state['clicks'].append(point)
+                st.rerun() # Refresh để cập nhật hình ảnh vẽ mới
