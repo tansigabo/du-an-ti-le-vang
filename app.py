@@ -35,7 +35,7 @@ if file:
     scale = 1
     if w > MAX_W:
         scale = MAX_W / w
-        display_img = = img.resize((int(w*scale), int(h*scale)))
+        display_img = img.resize((int(w*scale), int(h*scale)))
     else:
         display_img = img.copy()
 
