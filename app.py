@@ -73,7 +73,8 @@ if file:
         ratio = st.session_state.measurements["length"] / st.session_state.measurements["width"]
         st.session_state.measurements["ratio"] = round(ratio, 3)
 
-    st.image(overlay, use_column_width=True)st.markdown("### Hướng dẫn")
+    st.image(overlay, use_column_width=True)
+    st.markdown("### Hướng dẫn")
     if len(points) < 2:
         st.info("Bước 1: Click 2 điểm để đo **chiều dài**")
     elif len(points) < 4:
@@ -100,3 +101,4 @@ if file:
 
 else:
     st.info("Vui lòng upload ảnh để bắt đầu")
+
