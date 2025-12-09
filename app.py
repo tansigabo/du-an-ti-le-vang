@@ -4,15 +4,12 @@ from PIL import Image, ImageDraw
 import numpy as np
 
 st.set_page_config(page_title="Đo tỉ lệ Dài / Rộng", layout="centered")
-
 MAX_W = 800
 R = 7
 
 if "points" not in st.session_state:
     st.session_state.points = []
 if "measurements" not in st.session_state:
-    pass
-else:
     st.session_state.measurements = {"length": None, "width": None, "ratio": None}
 if "last_file" not in st.session_state:
     st.session_state.last_file = None
@@ -51,8 +48,8 @@ if file:
     overlay = display_img.copy()
     draw = ImageDraw.Draw(overlay)
     points = st.session_state.points
-
     colors = ["lime", "lime", "cyan", "cyan"]
+
     for i, p in enumerate(points):
         scaled_p = (int(p[0]*scale), int(p[1]*scale))
         draw_point(draw, scaled_p, color=colors[i])
@@ -62,16 +59,19 @@ if file:
         p2 = (int(points[1][0]*scale), int(points[1][1]*scale))
         draw_line(draw, p1, p2, "lime")
         length_px = np.linalg.norm(np.array(points[0]) - np.array(points[1]))
-        st.session_state.measurements["length"] = round(length_px, 1)
+        st.session_state.measurements["length"] = length_px
 
     if len(points) >= 4:
         p3 = (int(points[2][0]*scale), int(points[2][1]*scale))
         p4 = (int(points[3][0]*scale), int(points[3][1]*scale))
         draw_line(draw, p3, p4, "cyan")
         width_px = np.linalg.norm(np.array(points[2]) - np.array(points[3]))
-        st.session_state.measurements["width"] = round(width_px, 1)
-        ratio = st.session_state.measurements["length"] / st.session_state.measurements["width"]
-        st.session_state.measurements["ratio"] = round(ratio, 3)
+        st.session_state.measurements["width"] = width_px
+        if width_px != 0:
+            ratio = length_px / width_px
+            st.session_state.measurements["ratio"] = ratio
+        else:
+            st.session_state.measurements["ratio"] = None
 
     st.image(overlay, use_column_width=True)
 
@@ -83,17 +83,26 @@ if file:
     else:
         st.success("Đo xong!")
 
+    def fmt_vn(num):
+        if num is None:
+            return "-"
+        s = f"{num:.10f}".rstrip("0").rstrip(".")
+        return s.replace(".", ",")
+
     m = st.session_state.measurements
     col1, col2, col3 = st.columns(3)
+
     with col1:
-        if m["length"]:
-            st.metric("Chiều dài", f"{m['length']} px")
+        if m["length"] is not None:
+            st.metric("Chiều dài", f"{fmt_vn(m['length'])} px")
+
     with col2:
-        if m["width"]:
-            st.metric("Chiều rộng", f"{m['width']} px")
+        if m["width"] is not None:
+            st.metric("Chiều rộng", f"{fmt_vn(m['width'])} px")
+
     with col3:
-        if m["ratio"]:
-            st.metric("Tỉ lệ Dài/Rộng", m["ratio"])
+        if m["ratio"] is not None:
+            st.metric("Tỉ lệ Dài/Rộng", fmt_vn(m["ratio"]))
 
     if st.button("Xóa tất cả điểm", type="primary"):
         st.session_state.points = []
